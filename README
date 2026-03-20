@@ -1,0 +1,71 @@
+PROJECT DOCUMENTATION: DIG-SYSTEM VHDL DPLL ARCHITECTURE
+
+    PROJECT OVERVIEW
+    DIG-SYSTEM is a high-performance Digital Phase-Locked Loop (DPLL) implementation specifically engineered for Xilinx 7-series (Artix, Kintex, Virtex) and UltraScale FPGA architectures. The primary objective of this system is to synchronize a 4-bit parallel data bus with the system clock (Clk) at sub-nanosecond precision.
+
+Unlike software-based synchronization, DIG-SYSTEM operates at the Hardware Abstraction Layer, utilizing physical IDELAYE2 primitive elements. This allows for real-time, deterministic timing adjustments without any CPU overhead or operating system jitter.
+
+    MATHEMATICAL FOUNDATION AND CONTROL THEORY
+    The system functions as a Second-Order Feedback Control Loop, drawing inspiration from Proportional-Integral (PI) controllers but optimized for high-speed digital logic gates.
+
+A. Phase Error Integration
+The system continuously compares the Input_Raw bus with the reference Clk using an XOR-based Phase Detector. The resulting error signal (e) is integrated into a 16-bit Phase Accumulator (phi).
+Equation: phi(n) = phi(n-1) + [error * ACC_STEP] + velocity(n)
+The ACC_STEP constant (16) defines the system's sensitivity to transient phase shifts.
+B. Adaptive Damping and Velocity Tracking
+To prevent limit-cycle oscillations and ensure long-term stability, the architecture implements a Damping Factor (zeta). This reduces the correction speed as the system converges toward the ideal phase alignment.
+Damping Equation: velocity(n) = velocity(n-1) + sign(phi) - (velocity(n-1) / 128)
+A Bit-Shift Operation (shift_right 7) is utilized as an efficient divider, maintaining stability without requiring complex DSP multipliers.
+C. Sigma-Delta Resolution Enhancement (SDM)
+Physical hardware taps in an FPGA typically have a resolution of approximately 78 picoseconds (at a 200 MHz REFCLK). DIG-SYSTEM achieves even higher precision by employing a First-Order Sigma-Delta Modulator.
+SDM Logic: Effective_Delay = Base_Delay + (Sigma_Delta_Accumulator > Threshold ? 1 : 0)
+This High-Speed Dithering creates an averaged delay value, allowing the signal to be positioned between physical hardware steps, effectively increasing resolution by a factor of 256.
+
+    ARCHITECTURAL COMPONENTS
+
+I. Metastability Guard
+The incoming raw data passes through a Dual-Stage Synchronizer (sync_reg_1, sync_reg_2). This minimizes the risk of Metastability when asynchronous external data enters the FPGA’s internal clock domain.
+II. IDELAYE2 Logic Array
+Four parallel IDELAYE2 primitives handle the 4-bit bus. They are configured in VAR_LOAD mode, allowing the control logic to update delay values on-the-fly without a global system reset.
+III. Hysteresis Lock Detector
+The Lock_Status is determined via a Schmitt-Trigger logic style using two distinct thresholds:
+
+    LOCK_LIMIT (64): The system is considered Locked when the phase error stays below this value.
+    UNLOCK_LIMIT (256): The lock is only considered lost if the error grows significantly.
+    This prevents Status Flickering in high-noise environments.
+
+    TECHNICAL SPECIFICATIONS
+
+    Data Path: 4-bit parallel synchronized bus.
+    Accumulator Resolution: 16-bit signed arithmetic.
+    Velocity Tracking: 8-bit signed range with damping.
+    Maximum Delay Range: 31 Taps (standard for Xilinx 7-series).
+    Sub-tap Precision: 8-bit resolution (256 virtual steps per physical tap).
+    Operating Frequency: Fully synchronous, limited only by the FPGA fabric speed (Fmax).
+
+    INSTALLATION AND IMPLEMENTATION
+
+Hardware Requirements
+
+    Xilinx FPGA Silicon: Artix-7, Kintex-7, Virtex-7, or Zynq-7000.
+    Reference Clock: The IDELAYCTRL component typically requires a stable 200 MHz REFCLK for internal calibration.
+
+Synthesis and Deployment
+
+    Add the DIG_SYSTEM.vhd file to your Vivado or ISE project.
+    Define physical pin constraints in your XDC file.
+    Ensure the Reset signal is asserted at power-up to calibrate the delay lines.
+    Once Lock_Status is High (1), the Signal_Out provides the phase-corrected error signal.
+    LONG-TERM RELIABILITY ANALYSIS
+    The system is designed for High-Availability (24/7/365) operation:
+
+    Anti-Windup: The Phase Accumulator is reset upon tap transitions to prevent control overshoot.
+    Thermal Drift Compensation: The DPLL continuously tracks phase shifts caused by FPGA temperature changes.
+
+AUTHOR: Juho Artturi Hemminki
+COPYRIGHT: Copyright (c) 2026 Juho Artturi Hemminki
+LICENSE: Apache License, Version 2.0
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+www.apache.org
