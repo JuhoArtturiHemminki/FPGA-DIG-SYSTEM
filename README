@@ -12,11 +12,14 @@ A. Phase Error Integration
 The system continuously compares the Input_Raw bus with the reference Clk using an XOR-based Phase Detector. The resulting error signal (e) is integrated into a 16-bit Phase Accumulator (phi).
 Equation: phi(n) = phi(n-1) + [error * ACC_STEP] + velocity(n)
 The ACC_STEP constant (16) defines the system's sensitivity to transient phase shifts.
+
 B. Adaptive Damping and Velocity Tracking
 To prevent limit-cycle oscillations and ensure long-term stability, the architecture implements a Damping Factor (zeta). This reduces the correction speed as the system converges toward the ideal phase alignment.
 Damping Equation: velocity(n) = velocity(n-1) + sign(phi) - (velocity(n-1) / 128)
-A Bit-Shift Operation (shift_right 7) is utilized as an efficient divider, maintaining stability without requiring complex DSP multipliers.
-C. Sigma-Delta Resolution Enhancement (SDM)
+
+C. Bit-Shift Operation (shift_right 7) is utilized as an efficient divider, maintaining stability without requiring complex DSP multipliers.
+
+D. Sigma-Delta Resolution Enhancement (SDM)
 Physical hardware taps in an FPGA typically have a resolution of approximately 78 picoseconds (at a 200 MHz REFCLK). DIG-SYSTEM achieves even higher precision by employing a First-Order Sigma-Delta Modulator.
 SDM Logic: Effective_Delay = Base_Delay + (Sigma_Delta_Accumulator > Threshold ? 1 : 0)
 This High-Speed Dithering creates an averaged delay value, allowing the signal to be positioned between physical hardware steps, effectively increasing resolution by a factor of 256.
@@ -25,8 +28,10 @@ This High-Speed Dithering creates an averaged delay value, allowing the signal t
 
 I. Metastability Guard
 The incoming raw data passes through a Dual-Stage Synchronizer (sync_reg_1, sync_reg_2). This minimizes the risk of Metastability when asynchronous external data enters the FPGA’s internal clock domain.
+
 II. IDELAYE2 Logic Array
 Four parallel IDELAYE2 primitives handle the 4-bit bus. They are configured in VAR_LOAD mode, allowing the control logic to update delay values on-the-fly without a global system reset.
+
 III. Hysteresis Lock Detector
 The Lock_Status is determined via a Schmitt-Trigger logic style using two distinct thresholds:
 
